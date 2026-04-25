@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
@@ -193,11 +194,26 @@ class _SignInScreenState extends State<SignInScreen> {
   bool _loading = false;
   String? _error;
 
+  Future<void> _signInAsGuest() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      await FirebaseAuth.instance.signInAnonymously();
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
   Future<void> _signInWithGoogle() async {
     setState(() { _loading = true; _error = null; });
     try {
-      // Use Firebase Auth's built-in web popup — no google_sign_in needed on web
-      await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+      if (kIsWeb) {
+        await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+      } else {
+        setState(() {
+          _error = 'Google Auth popup is web-only. Please use "Demo Mode" below to view the system locally.';
+          _loading = false;
+        });
+      }
     } catch (e) {
       setState(() { _error = e.toString(); _loading = false; });
     }
@@ -288,6 +304,27 @@ class _SignInScreenState extends State<SignInScreen> {
                   label: Text(
                     _loading ? 'Signing in…' : 'Sign in with Google',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Demo Mode Button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _loading ? null : _signInAsGuest,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0D7377),
+                    side: const BorderSide(color: Color(0xFF0D7377)),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.visibility),
+                  label: Text(
+                    'Try Demo Mode',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
                   ),
                 ),
               ),
