@@ -9,7 +9,6 @@
 [![Dart](https://img.shields.io/badge/Dart-3.10-0175C2?style=flat-square&logo=dart)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=flat-square&logo=firebase)](https://firebase.google.com)
 [![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-4285F4?style=flat-square&logo=google)](https://ai.google.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](https://github.com/varunpai314/BLE_Project/blob/main/LICENSE)
 
 **Google Solution Challenge 2026 · Team Argus · NMAMIT, Nitte**
 
@@ -36,19 +35,22 @@ Patients wear a small ESP32 wristband beacon. Android phones placed at ward entr
 [ESP32 Beacon - patient wristband]
         │ BLE advertisement (8-byte payload, 500ms interval)
         ▼
-[Android Gateway App - Flutter]     ← one phone per ward zone
+[Android Gateway App - Flutter]     ← nurse logs in, registers name
         │ HTTP POST /beacon  (local WiFi, ~200ms latency)
+        │ POST /register-nurse (FCM token + gateway ID)
         ▼
-[Dart Server - shelf, headless]  ◄──► [Flutter Web Dashboard]
-        │ RSSI triangulation             live animated zone map
-        │ zone assignment
+[Dart Server - shelf, headless]  ◄──► [Flutter Web Dashboard - Firebase Hosted]
+        │ Rule-based zone dwell detection         Google Sign-In auth gate
+        │ zone assignment                         Shift Summary button
         ▼
 [Firebase Firestore]                ← cloud persistence (asia-south1)
         ▼
-[Gemini 2.5 Flash API]              ← AI anomaly detection
-        │ fires when patient exceeds zone threshold
+[Gemini 2.5 Flash API]
+        │  ├─ Per-patient alert (threshold breached)
+        │  ├─ Bottleneck alert (≥2 patients overdue in same zone)
+        │  └─ Shift summary (on-demand handover report)
         ▼
-  [Nurse Alert → Dashboard]         (FCM push — planned)
+[FCM Push → nurse's phone in that zone]   ← proximity-aware delivery
 ```
 
 ---
@@ -59,12 +61,16 @@ Patients wear a small ESP32 wristband beacon. Android phones placed at ward entr
 |---|---|
 | ESP32 BLE beacon firmware (8-byte custom payload) | ✅ Working |
 | Flutter Android gateway app — dynamic server IP + zone selection | ✅ Working |
+| Nurse name registration at gateway setup | ✅ Working |
 | Dart/shelf BLE processing server with RSSI zone logic | ✅ Working |
 | Animated Flutter Web dashboard with interactive hospital map | ✅ Working |
 | Firebase Firestore — patient, event & alert persistence | ✅ Working |
-| Gemini 2.5 Flash AI anomaly detection + human-readable alerts | ✅ Working |
+| Gemini 2.5 Flash — per-patient anomaly alert generation | ✅ Working |
+| Gemini — multi-patient bottleneck detection (≥2 in same zone) | ✅ Working |
+| Gemini — on-demand shift handover summary (GET /summary) | ✅ Working |
+| FCM proximity alerts — push to nurse in patient's zone | ✅ Working |
+| Google Sign-In auth gate on dashboard (Firebase Auth) | ✅ Working |
 | Firebase Hosting — live public dashboard | ✅ Deployed |
-| FCM push notifications to nurse phones | 🔲 Planned |
 
 ---
 
@@ -73,9 +79,11 @@ Patients wear a small ESP32 wristband beacon. Android phones placed at ward entr
 | Technology | Role |
 |---|---|
 | **Flutter** | Android gateway app + Flutter Web dashboard |
+| **Firebase Auth** | Google Sign-In gate for the dashboard |
 | **Firebase Firestore** | Cloud persistence for patients, events, alerts |
 | **Firebase Hosting** | Live public dashboard (`proximia-argus.web.app`) |
-| **Gemini 2.5 Flash API** | Real-time AI anomaly detection & alert generation |
+| **Firebase Cloud Messaging (FCM)** | Proximity-aware push alerts to nurses |
+| **Gemini 2.5 Flash API** | Per-patient alerts, bottleneck detection, shift summaries |
 
 ---
 
@@ -142,7 +150,13 @@ Set up on Android — enter the server IP (`192.168.x.x:8080`) and select the Ga
 | X-Ray Room | GW_004 | 30 minutes |
 | General Ward | GW_005 | 6 hours |
 
-The server uses **rule-based threshold detection** — when a patient's dwell time exceeds the zone limit, a trigger fires. At that point, **Gemini 2.5 Flash** is called to generate a one-sentence, plain-English nursing alert using the patient's context (zone, duration, gateway). Alerts are deduplicated with a 30-minute cooldown per patient, and stored in Firestore.
+The server uses **rule-based threshold detection** — when a patient's dwell time in a zone exceeds the limit, three things happen:
+
+1. **Per-patient alert** — Gemini generates a one-sentence clinical nursing alert with the patient's context
+2. **Bottleneck alert** — if ≥2 patients are overdue in the *same zone*, Gemini generates a systemic bottleneck alert (e.g. equipment delay, staffing gap)
+3. **FCM push** — the alert is routed to the nurse whose phone is registered on that gateway zone
+
+All alerts are deduplicated with a 30-minute cooldown and stored in Firestore. The dashboard's "Shift Summary" button calls `GET /summary` to generate a Gemini-authored handover report for the entire session.
 
 ---
 
@@ -172,4 +186,5 @@ The server uses **rule-based threshold detection** — when a patient's dwell ti
 
 ## License
 
-MIT License — see [LICENSE](https://github.com/varunpai314/BLE_Project/blob/main/LICENSE) for details.
+© 2026 Varun Pai. All rights reserved.
+This source code is made available for evaluation and demonstration purposes only. No license is granted for use, modification, or distribution without explicit written permission from the author.

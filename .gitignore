@@ -19,3 +19,10 @@ coverage/
 # Project specifics
 service-account.json
 pubspec.lock
+
+# Ignore extraneous files
+hospital_server/
+*.png
+*.jpeg
+*.jpg
+.firebase/

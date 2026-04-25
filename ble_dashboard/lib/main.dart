@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -160,7 +161,145 @@ class DashboardApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(),
         useMaterial3: true,
       ),
-      home: const DashboardScreen(),
+      home: StreamBuilder<User?>(
+        stream: FirebaseAuth.instance.authStateChanges(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            );
+          }
+          if (snapshot.hasData) {
+            return const DashboardScreen();
+          }
+          return const SignInScreen();
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+//  Sign-In Screen
+// ─────────────────────────────────────────
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({super.key});
+
+  @override
+  State<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends State<SignInScreen> {
+  bool _loading = false;
+  String? _error;
+
+  Future<void> _signInWithGoogle() async {
+    setState(() { _loading = true; _error = null; });
+    try {
+      // Use Firebase Auth's built-in web popup — no google_sign_in needed on web
+      await FirebaseAuth.instance.signInWithPopup(GoogleAuthProvider());
+    } catch (e) {
+      setState(() { _error = e.toString(); _loading = false; });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D7377),
+      body: Center(
+        child: Container(
+          width: 380,
+          padding: const EdgeInsets.all(40),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.15),
+                blurRadius: 32,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF0D7377).withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.local_hospital_rounded,
+                  color: Color(0xFF0D7377),
+                  size: 40,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Proximia',
+                style: GoogleFonts.inter(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: const Color(0xFF0D7377),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Patient Tracking Dashboard',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: Colors.grey.shade500,
+                ),
+              ),
+              const SizedBox(height: 36),
+              if (_error != null) ...[  
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _error!,
+                    style: TextStyle(color: Colors.red.shade700, fontSize: 12),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: _loading ? null : _signInWithGoogle,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0D7377),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: _loading
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                      : const Icon(Icons.login_rounded),
+                  label: Text(
+                    _loading ? 'Signing in…' : 'Sign in with Google',
+                    style: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 15),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Authorised hospital staff only',
+                style: GoogleFonts.inter(fontSize: 11, color: Colors.grey.shade400),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -323,6 +462,68 @@ class _DashboardScreenState extends State<DashboardScreen>
 
   int get _activeZoneCount => _patients.map((p) => p.currentZone).toSet().length;
 
+  /// Calls GET /summary and shows Gemini shift summary in a dialog.
+  Future<void> _generateShiftSummary() async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const AlertDialog(
+        content: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Text('Generating shift summary…'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final response = await http
+          .get(Uri.parse('$serverUrl/summary'))
+          .timeout(const Duration(seconds: 25));
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); // dismiss loading
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final summary = data['summary'] as String? ?? 'No summary generated.';
+
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Row(
+            children: [
+              const Icon(Icons.summarize_rounded, color: Color(0xFF0D7377)),
+              const SizedBox(width: 8),
+              Text('Shift Summary', style: GoogleFonts.inter(fontWeight: FontWeight.bold)),
+            ],
+          ),
+          content: SizedBox(
+            width: 480,
+            child: Text(
+              summary,
+              style: GoogleFonts.inter(fontSize: 14, height: 1.6),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Summary failed: $e'), backgroundColor: Colors.red),
+      );
+    }
+}
+
   Color _zoneColor(String zone) {
     switch (zone.toLowerCase()) {
       case 'mri room':           return const Color(0xFF2563EB);
@@ -440,6 +641,16 @@ class _DashboardScreenState extends State<DashboardScreen>
             ],
           ),
           const Spacer(),
+          // Shift Summary button
+          TextButton.icon(
+            onPressed: _generateShiftSummary,
+            icon: const Icon(Icons.summarize_rounded, color: Colors.white70, size: 16),
+            label: Text(
+              'Shift Summary',
+              style: GoogleFonts.inter(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 8),
           // LIVE badge
           _buildLiveBadge(),
           const SizedBox(width: 16),
@@ -450,6 +661,13 @@ class _DashboardScreenState extends State<DashboardScreen>
               color: Colors.white.withOpacity(0.55),
               fontSize: 11,
             ),
+          ),
+          const SizedBox(width: 12),
+          // Sign out
+          IconButton(
+            icon: const Icon(Icons.logout_rounded, color: Colors.white60, size: 18),
+            tooltip: 'Sign out',
+            onPressed: () => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
