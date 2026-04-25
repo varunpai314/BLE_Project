@@ -65,7 +65,7 @@ manually updating. This is the pilot deployment site. The product is hospital-ag
 
 ---
 
-## CURRENT STATUS (as of 2026-04-18 END OF DAY)
+## CURRENT STATUS (as of 2026-04-25 END OF DAY)
 
 ### What's Working ✅
 - ESP32 beacon broadcasting correct 8-byte payload.
@@ -81,6 +81,7 @@ manually updating. This is the pilot deployment site. The product is hospital-ag
   - Authenticated seamlessly using Google Sign-In, wrapped safely inside an `AuthGate` to prevent native Windows crash logic by introducing a "Try Demo Mode" button which entirely bypasses Firebase Auth.
   - Live animated pulsating borders when a patient is lingering.
   - Generates Shift Summaries straight onto the dashboard via a dialog.
+- **Firebase Web Auth Fixed (2026-04-25)**: Google Sign-In now works seamlessly on deployed web dashboard after running `flutterfire configure --project=proximia-argus`.
 
 ---
 
@@ -109,7 +110,32 @@ manually updating. This is the pilot deployment site. The product is hospital-ag
 - **New Account Gemini Keys**: New AI Studio projects generated in your region hit a `limit:0` block on free-tier for `gemini-2.0-flash` and 404 for `1.5-flash`. The provided `AQ...` key is hardcoded currently in `ble_server.dart` and works flawlessly.
 - To access the dashboard over WiFi, DO NOT use `-d chrome`. Use `flutter run -d web-server --web-hostname=0.0.0.0` or Windows Firewall will block the debug websocket port.
 - Port 8080 conflict on restart: kill with `Stop-Process -Id (Get-NetTCPConnection -LocalPort 8080).OwningProcess -Force`
+- **Firebase Web Auth Fix (RESOLVED 2026-04-25)**: `signInWithPopup()` requires Firebase JS SDK in `web/index.html`. Fixed by running `flutterfire configure --project=proximia-argus` which auto-injects the SDK scripts. Google Sign-In now works seamlessly on web. This is the proper setup — `web/index.html` is manually managed and won't be overwritten by `flutter build web`.
+
+---
+
+## FIREBASE WEB SETUP (FOR REFERENCE)
+
+### If Starting Fresh or Reconfiguring
+```bash
+# Install FlutterFire CLI globally
+dart pub global activate flutterfire_cli
+
+# Configure Firebase for all platforms (auto-updates web/index.html)
+flutterfire configure --project=proximia-argus
+
+# Rebuild and redeploy
+flutter clean
+flutter build web --release
+firebase deploy --only hosting
+```
+
+### What This Does
+- Generates `lib/firebase_options.dart` with type-safe config
+- Auto-injects Firebase JS SDK scripts into `web/index.html`
+- Syncs credentials across Android/iOS/Web platforms
+- `web/index.html` is yours to edit — Flutter won't regenerate it
 
 ---
 *Paste this entire file at the start of a new chat to continue seamlessly.*
-*Last updated: 2026-04-25 after completing FCM Proximity alerts, Web Auth, Demo bypass, Bottleneck logic, and Firebase Hosting.*
+*Last updated: 2026-04-25 after fixing Firebase web auth, completing FCM proximity alerts, Web Auth, Demo bypass, Bottleneck logic, and Firebase Hosting.*

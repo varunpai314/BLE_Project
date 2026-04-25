@@ -61,4 +61,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'proximia-argus.firebasestorage.app',
     measurementId: 'G-92BC27M582',
   );
+
 }
