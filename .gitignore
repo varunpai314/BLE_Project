@@ -1,0 +1,21 @@
+# Global ignores
+.env
+*.env
+.DS_Store
+Thumbs.db
+
+# Dart/Flutter
+.dart_tool/
+.packages
+.pub/
+build/
+coverage/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# Project specifics
+service-account.json
+pubspec.lock

@@ -1,0 +1,29 @@
+# ESP-IDF build directory
+build/
+
+# Project configuration files
+# sdkconfig is generated from sdkconfig.defaults and should typically be ignored
+# as it contains local environment settings.
+sdkconfig
+sdkconfig.old
+
+# ESP-IDF Component Manager
+managed_components/
+dependencies.lock
+
+# Python artifacts (used by idf.py and other tools)
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# VS Code / Editor specific
+.vscode/
+.clangd/
+
+# Log and temporary files
+*.log
+pytest_embedded_log/
+app_info_*.txt
+size_info_*.txt
+
