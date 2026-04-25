@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "482840414067",
+    "project_id": "proximia-argus",
+    "storage_bucket": "proximia-argus.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:482840414067:android:80c6daee13fb3c07ac2706",
+        "android_client_info": {
+          "package_name": "com.example.gateway_app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "482840414067-vaipmc57s4a1vdltr5eadkh2flrccckn.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDp8pT998-uaP8DSqveX7o4AKUSRVL9wm4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "482840414067-vaipmc57s4a1vdltr5eadkh2flrccckn.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

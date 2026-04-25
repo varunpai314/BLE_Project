@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:firebase_admin_sdk/firebase_admin_sdk.dart';
+import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http_pkg;
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
@@ -142,9 +143,7 @@ class NurseRegistration {
 /// gatewayId → nurse currently assigned to that phone
 final Map<String, NurseRegistration> _nurseRegistry = {};
 
-/// Send an FCM push to the nurse in the patient's zone.
-/// Uses the FCM HTTP v1 API (service-account bearer token not available in
-/// firebase_admin_sdk yet, so we call the legacy FCM send endpoint instead).
+/// Send an FCM push to the nurse in the patient's zone using HTTP v1 API.
 Future<void> _sendFcmAlert(PatientAlert alert) async {
   final gatewayId = zoneToGatewayMap[alert.zone];
   if (gatewayId == null) return;
@@ -155,38 +154,44 @@ Future<void> _sendFcmAlert(PatientAlert alert) async {
     return;
   }
 
-  // We call the FCM v1 REST API using the Gemini API key server-auth flow is
-  // unavailable; instead use the Firebase Admin SDK's messaging helper if
-  // present, otherwise fall back to the legacy /send endpoint with server key.
-  // For the demo we POST to the legacy endpoint — set FCM_SERVER_KEY in .env.
-  final serverKey = _fcmServerKey;
-  if (serverKey.isEmpty) {
-    print('[FCM]     FCM_SERVER_KEY not set — cannot send push to ${nurse.nurseName}');
+  final file = File('service-account.json');
+  if (!file.existsSync()) {
+    print('[FCM]     service-account.json not found — cannot authenticate FCM HTTP v1.');
     return;
   }
 
   try {
-    final uri = Uri.parse('https://fcm.googleapis.com/fcm/send');
+    final creds = ServiceAccountCredentials.fromJson(file.readAsStringSync());
+    final client = await clientViaServiceAccount(creds, ['https://www.googleapis.com/auth/firebase.messaging']);
+    final token = client.credentials.accessToken.data;
+
+    final uri = Uri.parse('https://fcm.googleapis.com/v1/projects/$firebaseProjectId/messages:send');
     final body = jsonEncode({
-      'to': nurse.fcmToken,
-      'notification': {
-        'title': '🚨 Proximia Alert — ${alert.zone}',
-        'body': alert.message,
-        'sound': 'default',
-      },
-      'data': {
-        'beacon_id': '${alert.beaconId}',
-        'zone': alert.zone,
-        'duration_minutes': '${alert.durationMinutes}',
-      },
-      'priority': 'high',
+      'message': {
+        'token': nurse.fcmToken,
+        'notification': {
+          'title': '🚨 Proximia Alert — ${alert.zone}',
+          'body': alert.message,
+        },
+        'data': {
+          'beacon_id': '${alert.beaconId}',
+          'zone': alert.zone,
+          'duration_minutes': '${alert.durationMinutes}',
+        },
+        'android': {
+          'priority': 'HIGH',
+          'notification': {
+            'sound': 'default',
+          }
+        }
+      }
     });
 
-    final response = await http_pkg
+    final response = await client
         .post(uri,
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'key=$serverKey',
+              'Authorization': 'Bearer $token',
             },
             body: body)
         .timeout(const Duration(seconds: 10));
@@ -196,6 +201,7 @@ Future<void> _sendFcmAlert(PatientAlert alert) async {
     } else {
       print('[FCM]     Push error ${response.statusCode}: ${response.body}');
     }
+    client.close();
   } catch (e) {
     print('[FCM]     Push failed: $e');
   }
@@ -318,8 +324,7 @@ final Map<int, DateTime> _lastAlertSentAt = {};
 // Bottleneck dedup: zone → last bottleneck alert time
 final Map<String, DateTime> _lastBottleneckAlertAt = {};
 
-// FCM server key — loaded from .env
-String _fcmServerKey = '';
+// (FCM now uses service-account.json instead of .env server key)
 
 // ─────────────────────────────────────────
 //  Core Zone Logic
@@ -889,18 +894,16 @@ Future<void> startServer() async {
   // Load environment variables from lib/.env
   final env = DotEnv(includePlatformEnvironment: true)..load(['lib/.env']);
   geminiApiKey = env['GCP_API_KEY'] ?? '';
-  _fcmServerKey = env['FCM_SERVER_KEY'] ?? '';
-
   if (geminiApiKey.isEmpty) {
     print('[CONFIG]  ⚠ GCP_API_KEY not found in lib/.env');
   } else {
     print('[CONFIG]  ✓ GCP_API_KEY loaded from lib/.env');
   }
 
-  if (_fcmServerKey.isEmpty) {
-    print('[CONFIG]  ⚠ FCM_SERVER_KEY not set — push notifications disabled');
+  if (!File('service-account.json').existsSync()) {
+    print('[CONFIG]  ⚠ service-account.json missing — Push notifications disabled.');
   } else {
-    print('[CONFIG]  ✓ FCM_SERVER_KEY loaded from lib/.env');
+    print('[CONFIG]  ✓ service-account.json found (FCM HTTP v1 ready)');
   }
 
   await _initFirebase();
@@ -936,7 +939,7 @@ Future<void> startServer() async {
       ? '✓ Key set ($geminiModel)'
       : '✗ Key missing';
 
-  final fcmStatus = _fcmServerKey.isEmpty ? '✗ Key missing' : '✓ Key set';
+  final fcmStatus = File('service-account.json').existsSync() ? '✓ Ready (HTTP v1)' : '✗ Missing service-account.json';
 
   print('');
   print('╔══════════════════════════════════════════╗');
