@@ -162,20 +162,47 @@ class DashboardApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(),
         useMaterial3: true,
       ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-          if (snapshot.hasData) {
-            return const DashboardScreen();
-          }
-          return const SignInScreen();
-        },
-      ),
+      home: const AuthGate(),
+    );
+  }
+}
+
+// ─────────────────────────────────────────
+//  Auth Gate (Handles Demo Bypass)
+// ─────────────────────────────────────────
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  State<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends State<AuthGate> {
+  bool _isDemoMode = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isDemoMode) {
+      return DashboardScreen(
+        onSignOut: () => setState(() => _isDemoMode = false),
+      );
+    }
+
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasData) {
+          return const DashboardScreen();
+        }
+        return SignInScreen(
+          onDemoMode: () => setState(() => _isDemoMode = true),
+        );
+      },
     );
   }
 }
@@ -184,7 +211,9 @@ class DashboardApp extends StatelessWidget {
 //  Sign-In Screen
 // ─────────────────────────────────────────
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  final VoidCallback onDemoMode;
+  
+  const SignInScreen({super.key, required this.onDemoMode});
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -195,12 +224,7 @@ class _SignInScreenState extends State<SignInScreen> {
   String? _error;
 
   Future<void> _signInAsGuest() async {
-    setState(() { _loading = true; _error = null; });
-    try {
-      await FirebaseAuth.instance.signInAnonymously();
-    } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
-    }
+    widget.onDemoMode();
   }
 
   Future<void> _signInWithGoogle() async {
@@ -345,7 +369,8 @@ class _SignInScreenState extends State<SignInScreen> {
 //  Dashboard Screen
 // ─────────────────────────────────────────
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final VoidCallback? onSignOut;
+  const DashboardScreen({super.key, this.onSignOut});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -704,7 +729,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           IconButton(
             icon: const Icon(Icons.logout_rounded, color: Colors.white60, size: 18),
             tooltip: 'Sign out',
-            onPressed: () => FirebaseAuth.instance.signOut(),
+            onPressed: widget.onSignOut ?? () => FirebaseAuth.instance.signOut(),
           ),
         ],
       ),
