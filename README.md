@@ -9,7 +9,7 @@
 [![Dart](https://img.shields.io/badge/Dart-3.10-0175C2?style=flat-square&logo=dart)](https://dart.dev)
 [![Firebase](https://img.shields.io/badge/Firebase-Firestore-FFCA28?style=flat-square&logo=firebase)](https://firebase.google.com)
 [![Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-4285F4?style=flat-square&logo=google)](https://ai.google.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green?style=flat-square)](https://github.com/varunpai314/BLE_Project/blob/main/LICENSE)
 
 **Google Solution Challenge 2026 · Team Argus · NMAMIT, Nitte**
 
@@ -142,7 +142,7 @@ Set up on Android — enter the server IP (`192.168.x.x:8080`) and select the Ga
 | X-Ray Room | GW_004 | 30 minutes |
 | General Ward | GW_005 | 6 hours |
 
-Gemini fires when a patient **exceeds the threshold** for their current zone, generating a one-sentence, plain-English nursing alert. Alerts are deduplicated with a 30-minute cooldown per patient.
+The server uses **rule-based threshold detection** — when a patient's dwell time exceeds the zone limit, a trigger fires. At that point, **Gemini 2.5 Flash** is called to generate a one-sentence, plain-English nursing alert using the patient's context (zone, duration, gateway). Alerts are deduplicated with a 30-minute cooldown per patient, and stored in Firestore.
 
 ---
 
@@ -172,4 +172,4 @@ Gemini fires when a patient **exceeds the threshold** for their current zone, ge
 
 ## License
 
-MIT License — see [LICENSE](LICENSE) for details.
+MIT License — see [LICENSE](https://github.com/varunpai314/BLE_Project/blob/main/LICENSE) for details.
